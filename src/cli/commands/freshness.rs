@@ -117,6 +117,7 @@ fn print_human(results: &[CheckResult]) {
     let mut fresh = 0u32;
     let mut drifted = 0u32;
     let mut missing = 0u32;
+    let mut incomparable = 0u32;
 
     for r in results {
         let (label, _subject_display) = match &r.status {
@@ -132,6 +133,10 @@ fn print_human(results: &[CheckResult]) {
                 missing += 1;
                 ("  MISSING", &r.span_display)
             }
+            FreshnessStatus::Incomparable { .. } => {
+                incomparable += 1;
+                ("  SKIPPED", &r.span_display)
+            }
             FreshnessStatus::NoHash => unreachable!(),
         };
         println!(
@@ -142,7 +147,7 @@ fn print_human(results: &[CheckResult]) {
 
     let total = results.len();
     println!();
-    println!("{total} annotations checked: {fresh} fresh, {drifted} drifted, {missing} missing");
+    println!("{total} annotations checked: {fresh} fresh, {drifted} drifted, {missing} missing, {incomparable} skipped (other digest scheme)");
 }
 
 fn print_json(results: &[CheckResult]) {
@@ -160,6 +165,9 @@ fn print_json(results: &[CheckResult]) {
                 ),
                 FreshnessStatus::Missing { reason } => {
                     ("missing", serde_json::json!({ "reason": reason }))
+                }
+                FreshnessStatus::Incomparable { scheme } => {
+                    ("incomparable", serde_json::json!({ "scheme": scheme }))
                 }
                 FreshnessStatus::NoHash => ("no_hash", serde_json::Value::Null),
             };
