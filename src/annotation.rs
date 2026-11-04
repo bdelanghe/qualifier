@@ -25,7 +25,8 @@ pub struct Span {
     /// End of the range (inclusive). Defaults to `start` if absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub end: Option<Position>,
-    /// BLAKE3 hash of the spanned lines (full lines, `\n`-joined).
+    /// Scheme-prefixed digest of the spanned lines (`blake3:<hex>`; full
+    /// lines, `\n`-joined). A bare hex string is legacy and means blake3.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_hash: Option<String>,
 }

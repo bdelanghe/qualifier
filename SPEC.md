@@ -254,7 +254,13 @@ since the annotation was written.
    Columns are ignored — full lines are always hashed.
 3. Join the extracted lines with `\n` (no trailing newline).
 4. Compute the BLAKE3 hash of the resulting byte string.
-5. Encode as lowercase hex.
+5. Encode as lowercase hex and prefix the scheme: `blake3:<hex>`.
+
+**Scheme naming.** `content_hash` is `scheme:hex`. This build writes
+`blake3:`. A value with no `scheme:` prefix is a legacy record and is read as
+`blake3`. Digests compare only within a scheme: a record whose scheme the
+reader does not compute is reported as incomparable (`qualifier freshness`
+status `incomparable`), never as fresh or drifted.
 
 **When computed:** The CLI auto-computes `content_hash` when creating span-
 addressed annotations (via `flag`, `suggest`, `comment`, `approve`, `reject`,
