@@ -2363,6 +2363,95 @@ fn test_show_filters_by_record_type() {
     assert_eq!(parsed["records"].as_array().unwrap().len(), 0);
 }
 
+/// Record `kind location message` (plus `extra` args) and return the new ID.
+fn record_id(dir: &Path, kind: &str, location: &str, message: &str, extra: &[&str]) -> String {
+    let mut args = vec![
+        "record",
+        kind,
+        location,
+        message,
+        "--issuer",
+        "mailto:test@test.com",
+        "--format",
+        "json",
+    ];
+    args.extend_from_slice(extra);
+    let (stdout, stderr, code) = run_qualifier(dir, &args);
+    assert_eq!(code, 0, "record {location} should succeed: {stderr}");
+    let v: serde_json::Value = serde_json::from_str(stdout.trim()).unwrap();
+    v["id"].as_str().unwrap().to_string()
+}
+
+#[test]
+fn test_compact_artifact_leaves_other_subjects_in_shared_qual() {
+    // Regression: `compact <artifact>` rewrote the whole directory-level
+    // `.qual`, pruning (or, with --snapshot, collapsing into epochs) the
+    // records of every other subject that shares the file.
+    for snapshot in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let a1 = record_id(dir.path(), "concern", "a.rs", "a first", &[]);
+        let a2 = record_id(
+            dir.path(),
+            "concern",
+            "a.rs",
+            "a second",
+            &["--supersedes", &a1],
+        );
+        let b1 = record_id(dir.path(), "concern", "b.rs", "b first", &[]);
+        let b2 = record_id(
+            dir.path(),
+            "concern",
+            "b.rs",
+            "b second",
+            &["--supersedes", &b1],
+        );
+
+        let mut args = vec!["compact", "a.rs"];
+        if snapshot {
+            args.push("--snapshot");
+        }
+        let (stdout, stderr, code) = run_qualifier(dir.path(), &args);
+        assert_eq!(code, 0, "compact should succeed: {stderr}");
+
+        let content = std::fs::read_to_string(dir.path().join(".qual")).unwrap();
+        let records = qualifier::qual_file::parse_str(&content).unwrap();
+        let ids: Vec<&str> = records.iter().map(|r| r.id()).collect();
+        assert!(
+            ids.contains(&b1.as_str()) && ids.contains(&b2.as_str()),
+            "b.rs records must be untouched (snapshot={snapshot}):\n{content}"
+        );
+        assert!(
+            records
+                .iter()
+                .filter(|r| r.subject() == "b.rs")
+                .all(|r| r.as_annotation().is_some()),
+            "no epoch for b.rs (snapshot={snapshot}):\n{content}"
+        );
+        assert!(
+            !ids.contains(&a1.as_str()),
+            "a.rs's superseded record is compacted (snapshot={snapshot}):\n{content}"
+        );
+        if snapshot {
+            assert!(!ids.contains(&a2.as_str()));
+            assert!(
+                records
+                    .iter()
+                    .any(|r| r.subject() == "a.rs" && r.as_epoch().is_some())
+            );
+            assert!(
+                stdout.contains("2 -> 1"),
+                "counts cover a.rs only: {stdout}"
+            );
+        } else {
+            assert!(ids.contains(&a2.as_str()));
+            assert!(
+                stdout.contains("2 -> 1"),
+                "counts cover a.rs only: {stdout}"
+            );
+        }
+    }
+}
+
 #[test]
 fn test_compact_preserves_unknown_record_type() {
     let dir = tempfile::tempdir().unwrap();

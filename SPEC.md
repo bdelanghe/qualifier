@@ -1172,6 +1172,11 @@ qualifier compact --all                      # compact every .qual file
 qualifier compact --all --dry-run            # preview repo-wide compaction
 ```
 
+With an artifact, only that subject's records are compacted. Records of
+other subjects in the same `.qual` file (a directory- or project-level
+layout) are left unchanged and in place. `--all` compacts every record in
+every discovered file.
+
 ### 6.9 `qualifier review`
 
 Check the freshness of span-addressed annotations against current file content.
