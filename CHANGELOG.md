@@ -19,6 +19,13 @@ the pre-1.0 caveat that any breaking change bumps the minor version).
   neither used nor modified. `QUALIFIER_BIN` selects a development build;
   `QUALIFIER_PLUGIN_HOME` relocates the installs.
 
+### Fixed
+
+- `compact <artifact>` compacts only that artifact's records. With the
+  default directory-level `.qual`, it previously pruned — or with
+  `--snapshot`, collapsed into epochs — the records of every other subject
+  sharing the file.
+
 ## [0.8.0] — 2026-09-25
 
 ### Added

@@ -1,5 +1,6 @@
 use clap::Args as ClapArgs;
 
+use crate::annotation::Record;
 use crate::cli::targets;
 use crate::compact as compact_lib;
 use crate::qual_file;
@@ -7,7 +8,8 @@ use crate::qual_file;
 #[derive(ClapArgs)]
 pub struct Args {
     /// The artifact to compact, relative to the current directory
-    /// (required unless --all)
+    /// (required unless --all). Only its records are compacted; other
+    /// subjects sharing its .qual file are left unchanged.
     pub artifact: Option<String>,
 
     /// Compact all .qual files in the repo
@@ -46,7 +48,7 @@ pub fn run(args: Args) -> crate::Result<()> {
     })?;
 
     let qf = qual_file::parse(&qual_path)?;
-    compact_one(&qf, args.snapshot, args.dry_run)?;
+    compact_one(&qf, Some(&subject), args.snapshot, args.dry_run)?;
 
     Ok(())
 }
@@ -60,17 +62,32 @@ fn run_all(args: &Args) -> crate::Result<()> {
     }
 
     for qf in &qual_files {
-        compact_one(qf, args.snapshot, args.dry_run)?;
+        compact_one(qf, None, args.snapshot, args.dry_run)?;
     }
 
     Ok(())
 }
 
-fn compact_one(qf: &qual_file::QualFile, snapshot: bool, dry_run: bool) -> crate::Result<()> {
+/// Compact `qf`. With `subject`, only that subject's records are compacted;
+/// records of other subjects sharing the file (a directory-level `.qual`)
+/// are kept unchanged and in place, and the compacted records take the
+/// position of the subject's first record.
+fn compact_one(
+    qf: &qual_file::QualFile,
+    subject: Option<&str>,
+    snapshot: bool,
+    dry_run: bool,
+) -> crate::Result<()> {
+    let in_scope = |r: &Record| subject.is_none_or(|s| r.subject() == s);
+    let scoped = qual_file::QualFile {
+        path: qf.path.clone(),
+        subject: qf.subject.clone(),
+        records: qf.records.iter().filter(|r| in_scope(r)).cloned().collect(),
+    };
     let (compacted, result) = if snapshot {
-        compact_lib::snapshot(qf)
+        compact_lib::snapshot(&scoped)
     } else {
-        compact_lib::prune(qf)
+        compact_lib::prune(&scoped)
     };
 
     if result.pruned == 0 {
@@ -100,7 +117,16 @@ fn compact_one(qf: &qual_file::QualFile, snapshot: bool, dry_run: bool) -> crate
     }
 
     if !dry_run {
-        qual_file::write_all(&qf.path, &compacted.records)?;
+        let mut compacted = Some(compacted.records);
+        let mut records = Vec::with_capacity(qf.records.len());
+        for r in &qf.records {
+            if !in_scope(r) {
+                records.push(r.clone());
+            } else if let Some(c) = compacted.take() {
+                records.extend(c);
+            }
+        }
+        qual_file::write_all(&qf.path, &records)?;
     } else {
         println!("  (dry run — no changes written)");
     }
