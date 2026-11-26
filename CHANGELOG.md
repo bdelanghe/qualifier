@@ -19,6 +19,12 @@ the pre-1.0 caveat that any breaking change bumps the minor version).
   neither used nor modified. `QUALIFIER_BIN` selects a development build;
   `QUALIFIER_PLUGIN_HOME` relocates the installs.
 
+### Fixed
+
+- `record` no longer panics on a span whose end line precedes its start
+  line (`src/a.rs:58:42`) or is 0 (`src/a.rs:1:0`); such spans are now a
+  validation error, and the span hasher returns no digest for them.
+
 ## [0.8.0] — 2026-09-25
 
 ### Added

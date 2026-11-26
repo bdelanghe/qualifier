@@ -677,10 +677,15 @@ pub fn validate(annotation: &Annotation) -> Vec<String> {
         if span.start.line == 0 {
             errors.push("span.start.line must be >= 1 (1-indexed)".into());
         }
-        if let Some(ref end) = span.end
-            && end.line == 0
-        {
-            errors.push("span.end.line must be >= 1 (1-indexed)".into());
+        if let Some(ref end) = span.end {
+            if end.line == 0 {
+                errors.push("span.end.line must be >= 1 (1-indexed)".into());
+            } else if end.line < span.start.line {
+                errors.push(format!(
+                    "span.end.line ({}) must not precede span.start.line ({})",
+                    end.line, span.start.line
+                ));
+            }
         }
         if let Some(col) = span.start.col
             && col == 0

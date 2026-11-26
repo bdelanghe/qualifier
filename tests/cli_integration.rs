@@ -744,6 +744,43 @@ fn test_record_with_span() {
 }
 
 #[test]
+fn test_record_rejects_reversed_span_without_panicking() {
+    // Regression: an end line before the start line (or an end line of 0)
+    // reached the span hasher, which sliced `lines[start-1..=end-1]` and
+    // panicked instead of reporting a validation error.
+    let dir = tempfile::tempdir().unwrap();
+    let source: String = (1..=100).map(|i| format!("line {i}\n")).collect();
+    std::fs::write(dir.path().join("lib.rs"), source).unwrap();
+
+    for location in ["lib.rs:58:42", "lib.rs:1:0"] {
+        let (_, stderr, code) = run_qualifier(
+            dir.path(),
+            &[
+                "record",
+                "concern",
+                location,
+                "Backwards span",
+                "--issuer",
+                "mailto:test@test.com",
+            ],
+        );
+        assert!(
+            !stderr.contains("panicked"),
+            "record {location} must not panic: {stderr}"
+        );
+        assert_ne!(code, 0, "record {location} should fail: {stderr}");
+        assert!(
+            stderr.contains("span.end"),
+            "error should name the span end for {location}: {stderr}"
+        );
+    }
+    assert!(
+        !dir.path().join(".qual").exists(),
+        "nothing should be written for an invalid span"
+    );
+}
+
+#[test]
 fn test_record_span_via_location() {
     let dir = tempfile::tempdir().unwrap();
 
