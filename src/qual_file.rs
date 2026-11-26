@@ -60,14 +60,34 @@ pub fn parse_str(content: &str) -> crate::Result<Vec<Record>> {
 /// Append a record to a `.qual` file.
 ///
 /// Creates the file if it doesn't exist. Always appends with a trailing newline.
+/// If the file's last line lacks its trailing newline (a hand edit), one is
+/// written first so the new record starts on its own line.
 pub fn append(path: &Path, record: &Record) -> crate::Result<()> {
     let mut file = fs::OpenOptions::new()
         .create(true)
+        .read(true)
         .append(true)
         .open(path)?;
     let json = serde_json::to_string(record)?;
-    writeln!(file, "{json}")?;
+    let separator = if ends_without_newline(&mut file)? {
+        "\n"
+    } else {
+        ""
+    };
+    writeln!(file, "{separator}{json}")?;
     Ok(())
+}
+
+/// True when `file` is non-empty and its last byte is not `\n`.
+fn ends_without_newline(file: &mut fs::File) -> std::io::Result<bool> {
+    use std::io::{Read, Seek, SeekFrom};
+    if file.metadata()?.len() == 0 {
+        return Ok(false);
+    }
+    file.seek(SeekFrom::End(-1))?;
+    let mut last = [0u8; 1];
+    file.read_exact(&mut last)?;
+    Ok(last[0] != b'\n')
 }
 
 /// Write a complete `.qual` file (used by compaction).

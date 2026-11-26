@@ -19,6 +19,12 @@ the pre-1.0 caveat that any breaking change bumps the minor version).
   neither used nor modified. `QUALIFIER_BIN` selects a development build;
   `QUALIFIER_PLUGIN_HOME` relocates the installs.
 
+### Fixed
+
+- Appending a record to a `.qual` file whose last line lacks its trailing
+  newline (e.g. after a hand edit) no longer glues the new record onto that
+  line and leaves the file unparseable; a newline is written first.
+
 ## [0.8.0] — 2026-09-25
 
 ### Added

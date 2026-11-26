@@ -141,6 +141,48 @@ fn test_annotation_lifecycle_write_parse_roundtrip() {
 }
 
 #[test]
+fn test_append_after_missing_trailing_newline() {
+    // Regression: a `.qual` file whose last line lacks its `\n` (a hand
+    // edit, an editor that strips final newlines) had the next record glued
+    // onto that line, making the whole file unparseable.
+    let dir = tempfile::tempdir().unwrap();
+    let qual_path = dir.path().join(".qual");
+
+    let first = make_record("a.rs", Kind::Concern, "first");
+    let second = make_record("a.rs", Kind::Praise, "second");
+    std::fs::write(&qual_path, serde_json::to_string(&first).unwrap()).unwrap();
+
+    qual_file::append(&qual_path, &second).unwrap();
+
+    let parsed = qual_file::parse(&qual_path).expect("file must stay parseable");
+    assert_eq!(parsed.records.len(), 2);
+    assert_eq!(parsed.records[0].id(), first.id());
+    assert_eq!(parsed.records[1].id(), second.id());
+    let content = std::fs::read_to_string(&qual_path).unwrap();
+    assert!(content.ends_with('\n'));
+    assert!(
+        !content.contains("\n\n"),
+        "no blank line inserted: {content:?}"
+    );
+}
+
+#[test]
+fn test_append_to_empty_file_adds_no_blank_line() {
+    let dir = tempfile::tempdir().unwrap();
+    let qual_path = dir.path().join(".qual");
+    std::fs::write(&qual_path, "").unwrap();
+
+    let record = make_record("a.rs", Kind::Pass, "ok");
+    qual_file::append(&qual_path, &record).unwrap();
+
+    let content = std::fs::read_to_string(&qual_path).unwrap();
+    assert_eq!(
+        content,
+        format!("{}\n", serde_json::to_string(&record).unwrap())
+    );
+}
+
+#[test]
 fn test_annotation_id_is_content_addressed() {
     let att1 = make_att("foo.rs", Kind::Pass, "ok");
     let att2 = make_att("foo.rs", Kind::Pass, "ok");
