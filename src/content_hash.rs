@@ -21,7 +21,8 @@ pub fn split_digest(digest: &str) -> (&str, &str) {
 ///
 /// Reads the file at `file_path`, extracts lines `start.line..=end.line`
 /// (1-indexed), joins them with `\n`, and hashes the result.
-/// Returns `None` if the file is unreadable or the span extends beyond EOF.
+/// Returns `None` if the file is unreadable, the span extends beyond EOF,
+/// or the span's end line precedes its start line.
 pub fn compute_span_hash(file_path: &Path, span: &Span) -> Option<String> {
     let content = std::fs::read_to_string(file_path).ok()?;
     let all_lines: Vec<&str> = content.lines().collect();
@@ -29,7 +30,7 @@ pub fn compute_span_hash(file_path: &Path, span: &Span) -> Option<String> {
     let start = span.start.line as usize;
     let end = span.end_or_start().line as usize;
 
-    if start == 0 || start > all_lines.len() || end > all_lines.len() {
+    if start == 0 || end < start || end > all_lines.len() {
         return None;
     }
 
@@ -122,6 +123,13 @@ mod tests {
             end: end.map(|line| Position { line, col: None }),
             content_hash: None,
         }
+    }
+
+    #[test]
+    fn test_compute_reversed_or_zero_end_span_is_none() {
+        let f = make_file(&["alpha", "beta", "gamma"]);
+        assert_eq!(compute_span_hash(f.path(), &span(3, Some(2))), None);
+        assert_eq!(compute_span_hash(f.path(), &span(1, Some(0))), None);
     }
 
     #[test]

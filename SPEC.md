@@ -201,7 +201,7 @@ A span is an object with these fields:
 | Field          | Type   | Required | Description |
 |----------------|--------|----------|-------------|
 | `start`        | object | yes      | Start of the range (inclusive) |
-| `end`          | object | no       | End of the range (inclusive). Defaults to `start`. |
+| `end`          | object | no       | End of the range (inclusive). Defaults to `start`. `end.line` MUST NOT be less than `start.line`. |
 | `content_hash` | string | no       | BLAKE3 hash of the spanned lines (see 2.4.3) |
 
 Each position has:
