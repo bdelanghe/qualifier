@@ -1987,6 +1987,51 @@ fn test_review_finds_annotations_from_subdirectory() {
     );
 }
 
+#[test]
+fn test_review_subject_filter_is_cwd_relative() {
+    // Regression: `review <subject>` compared the raw argument against the
+    // stored root-relative subject, so `review lib.rs` from `src/` (or
+    // `review ./src/lib.rs` from the root) silently matched nothing.
+    let dir = tempfile::tempdir().unwrap();
+    git_init(dir.path());
+
+    let src_dir = dir.path().join("src");
+    std::fs::create_dir(&src_dir).unwrap();
+    std::fs::write(src_dir.join("lib.rs"), "fn alpha() {}\n").unwrap();
+    std::fs::write(src_dir.join("other.rs"), "fn beta() {}\n").unwrap();
+    for location in ["src/lib.rs:1", "src/other.rs:1"] {
+        let (_, stderr, rc) = run_qualifier(
+            dir.path(),
+            &[
+                "record",
+                "concern",
+                location,
+                "look here",
+                "--issuer",
+                "mailto:test@test.com",
+            ],
+        );
+        assert_eq!(rc, 0, "record should succeed: {stderr}");
+    }
+
+    for (cwd, arg) in [
+        (&src_dir, "lib.rs"),
+        (&dir.path().to_path_buf(), "./src/lib.rs"),
+    ] {
+        let (stdout, stderr, code) = run_qualifier(cwd, &["review", arg]);
+        assert_eq!(code, 0, "review {arg} should succeed: {stderr}");
+        assert!(
+            stdout.contains("1 annotations checked: 1 fresh"),
+            "review {arg} from {} should check exactly src/lib.rs: {stdout}",
+            cwd.display()
+        );
+    }
+
+    let (_, stderr, code) = run_qualifier(&src_dir, &["review", "../../outside.rs"]);
+    assert_ne!(code, 0, "a subject outside the project root is an error");
+    assert!(stderr.contains("outside the project root"), "{stderr}");
+}
+
 // --- qualifier emit (raw record write) ---
 
 #[test]
