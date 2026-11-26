@@ -19,6 +19,13 @@ the pre-1.0 caveat that any breaking change bumps the minor version).
   neither used nor modified. `QUALIFIER_BIN` selects a development build;
   `QUALIFIER_PLUGIN_HOME` relocates the installs.
 
+### Fixed
+
+- `compact` (prune) no longer orphans replies. It used to drop a superseded
+  record even when a kept reply named it in `references`, so after
+  compacting a resolved thread its replies resurfaced in `threads` as a new
+  open thread. Such records, and the records superseding them, are now kept.
+
 ## [0.8.0] — 2026-09-25
 
 ### Added

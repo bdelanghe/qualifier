@@ -720,3 +720,75 @@ fn test_threads_tie_break_by_origin_id_is_deterministic() {
     assert_eq!(order_forward, expected);
     assert_eq!(order_backward, expected);
 }
+
+// --- compaction keeps threads intact ---
+
+fn pruned(records: Vec<Record>) -> Vec<Record> {
+    let qf = QualFile {
+        path: PathBuf::from(".qual"),
+        subject: String::new(),
+        records,
+    };
+    compact::prune(&qf).0.records
+}
+
+#[test]
+fn test_prune_keeps_resolved_thread_closed() {
+    // Regression: prune dropped the resolved root, so the reply that
+    // referenced it lost its parent and surfaced as a new *open* thread.
+    let root = ann("a.rs", Kind::Concern, "root", 0, None, None);
+    let reply = ann("a.rs", Kind::Comment, "reply", 10, Some(root.id()), None);
+    let fix = ann("a.rs", Kind::Resolve, "fixed", 20, None, Some(root.id()));
+
+    let kept = pruned(vec![root.clone(), reply.clone(), fix.clone()]);
+    let threads = build_threads(&kept);
+    assert_eq!(threads.len(), 1, "reply must stay in its thread");
+    assert!(!threads[0].open, "resolved thread must stay closed");
+    assert_eq!(threads[0].root.id(), root.id());
+    assert_eq!(threads[0].closed_by.map(|r| r.id()), Some(fix.id()));
+    assert_eq!(threads[0].replies.len(), 1);
+    assert_eq!(threads[0].replies[0].record.id(), reply.id());
+}
+
+#[test]
+fn test_prune_keeps_edit_chain_under_a_reply() {
+    let root = ann("a.rs", Kind::Concern, "root", 0, None, None);
+    let reply = ann("a.rs", Kind::Comment, "reply", 10, Some(root.id()), None);
+    let edit1 = ann("a.rs", Kind::Concern, "edit 1", 20, None, Some(root.id()));
+    let edit2 = ann("a.rs", Kind::Concern, "edit 2", 30, None, Some(edit1.id()));
+    // An unrelated chain nobody replied to still collapses to its tip.
+    let other = ann("b.rs", Kind::Concern, "other", 0, None, None);
+    let other_edit = ann(
+        "b.rs",
+        Kind::Concern,
+        "other edit",
+        10,
+        None,
+        Some(other.id()),
+    );
+
+    let kept = pruned(vec![
+        root.clone(),
+        reply.clone(),
+        edit1.clone(),
+        edit2.clone(),
+        other.clone(),
+        other_edit.clone(),
+    ]);
+    let ids: Vec<&str> = kept.iter().map(|r| r.id()).collect();
+    assert!(
+        !ids.contains(&other.id()),
+        "unreferenced superseded record is pruned"
+    );
+    assert!(ids.contains(&other_edit.id()));
+
+    let threads: Vec<_> = build_threads(&kept)
+        .into_iter()
+        .filter(|t| t.root.subject() == "a.rs")
+        .collect();
+    assert_eq!(threads.len(), 1, "reply must stay in its thread");
+    assert!(threads[0].open);
+    assert_eq!(threads[0].root.id(), edit2.id());
+    assert_eq!(threads[0].replies.len(), 1);
+    assert_eq!(threads[0].replies[0].record.id(), reply.id());
+}
