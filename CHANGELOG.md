@@ -19,6 +19,12 @@ the pre-1.0 caveat that any breaking change bumps the minor version).
   neither used nor modified. `QUALIFIER_BIN` selects a development build;
   `QUALIFIER_PLUGIN_HOME` relocates the installs.
 
+### Fixed
+
+- `review <subject>` resolves the subject relative to the current directory,
+  like `show` and `compact`; from a subdirectory (or with a `./` prefix) it
+  previously matched nothing and reported no annotations.
+
 ## [0.8.0] — 2026-09-25
 
 ### Added

@@ -1,12 +1,14 @@
 use clap::Args as ClapArgs;
 
+use crate::cli::targets;
 use crate::compact::filter_superseded;
 use crate::content_hash::{self, FreshnessStatus};
-use crate::qual_file::{self, find_project_root};
+use crate::qual_file;
 
 #[derive(ClapArgs)]
 pub struct Args {
-    /// Only check annotations for this subject
+    /// Only check annotations for this subject, relative to the current
+    /// directory
     pub subject: Option<String>,
 
     /// Output format (human, json)
@@ -27,9 +29,13 @@ struct CheckResult {
 }
 
 pub fn run(args: Args) -> crate::Result<()> {
-    let cwd = std::env::current_dir()?;
-    let project_root = find_project_root(&cwd);
-    let discover_root = project_root.as_deref().unwrap_or(cwd.as_path());
+    let locator = targets::Locator::from_cwd()?;
+    let subject_filter = args
+        .subject
+        .as_deref()
+        .map(|s| locator.subject(s))
+        .transpose()?;
+    let discover_root = locator.root();
     let qual_files = qual_file::discover(discover_root, !args.no_ignore)?;
 
     if qual_files.is_empty() {
@@ -59,7 +65,7 @@ pub fn run(args: Args) -> crate::Result<()> {
             continue;
         }
 
-        if let Some(subject_filter) = &args.subject
+        if let Some(subject_filter) = &subject_filter
             && record.subject() != subject_filter
         {
             continue;
@@ -147,7 +153,9 @@ fn print_human(results: &[CheckResult]) {
 
     let total = results.len();
     println!();
-    println!("{total} annotations checked: {fresh} fresh, {drifted} drifted, {missing} missing, {incomparable} skipped (other digest scheme)");
+    println!(
+        "{total} annotations checked: {fresh} fresh, {drifted} drifted, {missing} missing, {incomparable} skipped (other digest scheme)"
+    );
 }
 
 fn print_json(results: &[CheckResult]) {

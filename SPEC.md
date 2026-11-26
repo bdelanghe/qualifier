@@ -897,8 +897,8 @@ The CLI binary is named `qualifier`. Writes go through four verbs:
 **Locations are relative to the current directory; subjects are stored
 relative to the project root** (§10). Every location or artifact argument
 — `record <location>`, batch `location`/`reply`/`resolve` values,
-`reply`/`resolve` targets, `threads` filters, and the `show`, `praise`, and
-`compact` artifacts — is joined to the current directory's path below the
+`reply`/`resolve` targets, `threads` filters, the `review` subject, and the
+`show`, `praise`, and `compact` artifacts — is joined to the current directory's path below the
 project root and normalized (`.` and `..` folded, `/` separators, the root
 itself is `.`). An argument that leaves the project root is an error. Every
 write lands in a `.qual` file under the project root, laid out as in
