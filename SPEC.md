@@ -1,6 +1,6 @@
 # Qualifier Specification
 
-**Version:** 0.5.0
+**Version:** 0.5.1
 **Status:** Draft
 **Authors:** Alex Kesling
 
@@ -623,7 +623,10 @@ reclaiming space.
 A compaction rewrites a `.qual` file by:
 
 1. **Pruning** all superseded records. If record B supersedes A, only B is
-   retained. The entire chain collapses to its tip.
+   retained. The entire chain collapses to its tip. Exception: a superseded
+   record that a retained record names in `references` is retained, along
+   with every record that supersedes it, so replies stay attached to their
+   thread and a resolved thread stays closed.
 2. **Optionally snapshotting.** When `--snapshot` is passed, all surviving
    records for each subject are replaced by a single epoch record.
 

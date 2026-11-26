@@ -32,15 +32,47 @@ pub fn filter_superseded(records: &[Record]) -> Vec<&Record> {
 /// Prune superseded records, keeping only chain tips.
 ///
 /// Non-annotation records (epochs, dependencies, unknowns) are always kept.
+/// A superseded record that a kept record names in `references` is kept
+/// too, along with every record superseding it, so replies stay attached
+/// to their thread (and a resolved thread stays closed).
 pub fn prune(qual_file: &QualFile) -> (QualFile, CompactResult) {
-    let before = qual_file.records.len();
-    let active = filter_superseded(&qual_file.records);
-    let after = active.len();
+    let records = &qual_file.records;
+    let before = records.len();
+    let ids: HashSet<&str> = records.iter().map(|r| r.id()).collect();
+    let mut keep: HashSet<&str> = filter_superseded(records)
+        .into_iter()
+        .map(|r| r.id())
+        .collect();
+    loop {
+        let mut grew = false;
+        for r in records {
+            let target = if keep.contains(r.id()) {
+                r.references().filter(|t| ids.contains(t))
+            } else if r.supersedes().is_some_and(|t| keep.contains(t)) {
+                Some(r.id())
+            } else {
+                None
+            };
+            if let Some(id) = target {
+                grew |= keep.insert(id);
+            }
+        }
+        if !grew {
+            break;
+        }
+    }
+
+    let kept: Vec<Record> = records
+        .iter()
+        .filter(|r| keep.contains(r.id()))
+        .cloned()
+        .collect();
+    let after = kept.len();
 
     let pruned_file = QualFile {
         path: qual_file.path.clone(),
         subject: qual_file.subject.clone(),
-        records: active.into_iter().cloned().collect(),
+        records: kept,
     };
 
     let result = CompactResult {
